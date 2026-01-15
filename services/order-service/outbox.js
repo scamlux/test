@@ -18,6 +18,8 @@ function markSent(id) {
   if (event) event.sent = true;
 }
 
+
+
 module.exports = {
   addEvent,
   getPendingEvents,
