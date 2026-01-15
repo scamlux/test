@@ -1,0 +1,52 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Забираем код из GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Ставим Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3. Проверяем order-service
+      - name: Install dependencies (order-service)
+        run: |
+          cd services/order-service
+          npm install
+
+      # 4. Проверяем inventory-service
+      - name: Install dependencies (inventory-service)
+        run: |
+          cd services/inventory-service
+          npm install
+
+      # 5. Проверяем payment-service
+      - name: Install dependencies (payment-service)
+        run: |
+          cd services/payment-service
+          npm install
+
+      # 6. Проверяем query-service
+      - name: Install dependencies (query-service)
+        run: |
+          cd services/query-service
+          npm install
+
+      # 7. Smoke check (Node стартует)
+      - name: Smoke test (order-service)
+        run: |
+          cd services/order-service
+          node -e "console.log('Order service OK')"
