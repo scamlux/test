@@ -1,52 +1,43 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
-      - master
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Забираем код из GitHub
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Ставим Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 3. Проверяем order-service
-      - name: Install dependencies (order-service)
+      # ===== CI =====
+      - name: Install dependencies
         run: |
-          cd services/order-service
-          npm install
+          cd services/order-service && npm install
+          cd ../inventory-service && npm install
+          cd ../payment-service && npm install
+          cd ../query-service && npm install
 
-      # 4. Проверяем inventory-service
-      - name: Install dependencies (inventory-service)
+      # ===== BUILD =====
+      - name: Build Docker images
         run: |
-          cd services/inventory-service
-          npm install
+          docker build -t order-service:${{ github.sha }} services/order-service
+          docker build -t inventory-service:${{ github.sha }} services/inventory-service
+          docker build -t payment-service:${{ github.sha }} services/payment-service
+          docker build -t query-service:${{ github.sha }} services/query-service
 
-      # 5. Проверяем payment-service
-      - name: Install dependencies (payment-service)
+      # ===== AUTODEPLOY =====
+      - name: Auto deploy (if build passed)
+        env:
+          TAG: ${{ github.sha }}
         run: |
-          cd services/payment-service
-          npm install
-
-      # 6. Проверяем query-service
-      - name: Install dependencies (query-service)
-        run: |
-          cd services/query-service
-          npm install
-
-      # 7. Smoke check (Node стартует)
-      - name: Smoke test (order-service)
-        run: |
-          cd services/order-service
-          node -e "console.log('Order service OK')"
+          echo "Deploying version $TAG"
+          docker compose -f docker-compose.deploy.yml up -d
