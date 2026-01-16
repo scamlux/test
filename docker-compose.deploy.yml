@@ -1,16 +1,14 @@
-version: "3.9"
-
 services:
   order-service:
-    image: order-service:${TAG}
+    image: scamlux3221/order-service:${TAG}
     ports:
       - "3001:3001"
 
   inventory-service:
-    image: inventory-service:${TAG}
+    image: scamlux3221/inventory-service:${TAG}
 
   payment-service:
-    image: payment-service:${TAG}
+    image: scamlux3221/payment-service:${TAG}
 
   query-service:
-    image: query-service:${TAG}
+    image: scamlux3221/query-service:${TAG}
