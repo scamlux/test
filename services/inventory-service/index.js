@@ -28,5 +28,5 @@ async function run() {
     },
   });
 }
-
+// Start the consumer
 run().catch(console.error);
