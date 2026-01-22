@@ -1,0 +1,45 @@
+replicaCount: 1
+image:
+  repository: docker.io/scamlux3221/payment-service
+  tag: latest
+service:
+  port: 8006
+  targetPort: 8006
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+env:
+  - name: NODE_ENV
+    value: production
+  - name: PORT
+    value: "8006"
+  - name: KAFKA_BROKERS
+    value: kafka-service:9092
+  - name: STRIPE_KEY
+    valueFrom:
+      secretKeyRef:
+        name: payment-secrets
+        key: stripe-key
+  - name: MONGO_URL
+    valueFrom:
+      secretKeyRef:
+        name: mongodb-credentials
+        key: connection-string
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8006
+  initialDelaySeconds: 30
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8006
+  initialDelaySeconds: 10

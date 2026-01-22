@@ -1,0 +1,102 @@
+{
+  "dashboard": {
+    "title": "API Gateway Metrics",
+    "tags": ["Agri Platform", "API"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Requests Per Minute",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[1m])"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "title": "Average Response Time (ms)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(http_request_duration_seconds) * 1000"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "title": "Total Requests",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(http_requests_total[1h])"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 8
+        }
+      },
+      {
+        "title": "Active Requests",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "http_requests_in_progress_total"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "title": "Request Distribution by Service",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (service)"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 18,
+          "y": 8
+        }
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "30s"
+  }
+}

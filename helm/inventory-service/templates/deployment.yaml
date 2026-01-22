@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: { { include "inventory-service.fullname" . } }
+spec:
+  replicas: { { .Values.replicaCount } }
+  selector:
+    matchLabels:
+      app: { { include "inventory-service.fullname" . } }
+  template:
+    metadata:
+      labels:
+        app: { { include "inventory-service.fullname" . } }
+    spec:
+      containers:
+        - name: inventory-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: { { .Values.service.targetPort } }
+          livenessProbe: { { - toYaml .Values.livenessProbe | nindent 12 } }
+          readinessProbe: { { - toYaml .Values.readinessProbe | nindent 12 } }
+          resources: { { - toYaml .Values.resources | nindent 12 } }
+          env: { { - toYaml .Values.env | nindent 12 } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: { { include "inventory-service.fullname" . } }
+spec:
+  type: ClusterIP
+  ports:
+    - port: { { .Values.service.port } }
+      targetPort: { { .Values.service.targetPort } }
+  selector:
+    app: { { include "inventory-service.fullname" . } }

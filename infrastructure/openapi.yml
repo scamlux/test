@@ -1,0 +1,762 @@
+openapi: 3.0.0
+info:
+  title: Agri Platform API
+  description: Agricultural microservices platform for product management, order processing, and delivery tracking
+  version: 1.0.0
+  contact:
+    name: Agri Platform Team
+    url: https://agri-platform.local
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local development server
+  - url: https://api.agri-platform.local/api
+    description: Production server
+
+tags:
+  - name: Products
+    description: Product catalog management
+  - name: Orders
+    description: Order creation and management
+  - name: Deliveries
+    description: Delivery tracking and management
+  - name: Logs
+    description: Request logging and monitoring
+  - name: Health
+    description: Service health checks
+
+paths:
+  /products:
+    get:
+      summary: List all products
+      tags:
+        - Products
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Successful response with list of products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Product"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+
+    post:
+      summary: Create a new product
+      tags:
+        - Products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - price
+                - category
+                - quantity
+              properties:
+                name:
+                  type: string
+                  example: Organic Tomatoes
+                price:
+                  type: number
+                  format: float
+                  example: 5.99
+                category:
+                  type: string
+                  example: Vegetables
+                quantity:
+                  type: integer
+                  example: 100
+                description:
+                  type: string
+                  example: Fresh organic tomatoes from local farmers
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /products/{productId}:
+    get:
+      summary: Get product details
+      tags:
+        - Products
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Product"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      summary: Update product
+      tags:
+        - Products
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: number
+                  format: float
+                category:
+                  type: string
+                quantity:
+                  type: integer
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      summary: Delete product
+      tags:
+        - Products
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Product deleted successfully
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orders:
+    get:
+      summary: List all orders
+      tags:
+        - Orders
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, completed, cancelled]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Order"
+
+    post:
+      summary: Create a new order
+      tags:
+        - Orders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+                - customerId
+                - deliveryAddress
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - productId
+                      - quantity
+                    properties:
+                      productId:
+                        type: string
+                        format: uuid
+                      quantity:
+                        type: integer
+                        minimum: 1
+                customerId:
+                  type: string
+                  example: CUST-001
+                deliveryAddress:
+                  type: string
+                  example: 123 Main St, City, Country
+                notes:
+                  type: string
+                  example: Please deliver on morning
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /orders/{orderId}:
+    get:
+      summary: Get order details
+      tags:
+        - Orders
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Order details with items and delivery information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/OrderDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      summary: Update order status
+      tags:
+        - Orders
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [pending, completed, cancelled]
+      responses:
+        "200":
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Order"
+
+    delete:
+      summary: Cancel order
+      tags:
+        - Orders
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Order cancelled
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /deliveries:
+    get:
+      summary: List all deliveries
+      tags:
+        - Deliveries
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, in_transit, delivered, cancelled]
+      responses:
+        "200":
+          description: List of deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Delivery"
+
+    post:
+      summary: Create delivery for order
+      tags:
+        - Deliveries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orderId
+                - address
+              properties:
+                orderId:
+                  type: string
+                  format: uuid
+                address:
+                  type: string
+                  example: 456 Oak Ave, City, Country
+                notes:
+                  type: string
+                  example: Leave at front door
+      responses:
+        "201":
+          description: Delivery created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Delivery"
+
+  /deliveries/{deliveryId}/start:
+    post:
+      summary: Start delivery (mark as in transit)
+      tags:
+        - Deliveries
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Delivery started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Delivery"
+
+  /deliveries/{deliveryId}/confirm:
+    post:
+      summary: Confirm delivery completion
+      tags:
+        - Deliveries
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signature:
+                  type: string
+                  example: John Doe
+                notes:
+                  type: string
+                  example: Received in good condition
+      responses:
+        "200":
+          description: Delivery confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Delivery"
+
+  /logs:
+    get:
+      summary: Get all request logs
+      tags:
+        - Logs
+      parameters:
+        - name: service
+          in: query
+          required: false
+          schema:
+            type: string
+            example: product-service
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: integer
+            example: 200
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Request logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RequestLog"
+
+  /metrics:
+    get:
+      summary: Get system metrics
+      tags:
+        - Logs
+      responses:
+        "200":
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_requests:
+                    type: integer
+                  error_count:
+                    type: integer
+                  success_count:
+                    type: integer
+                  error_rate:
+                    type: string
+                  avg_response_time:
+                    type: number
+                    format: float
+
+  /health:
+    get:
+      summary: Health check endpoint
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+        - category
+        - quantity
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Organic Tomatoes
+        price:
+          type: number
+          format: float
+          example: 5.99
+        category:
+          type: string
+          example: Vegetables
+        quantity:
+          type: integer
+          example: 100
+        description:
+          type: string
+          example: Fresh organic tomatoes
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Order:
+      type: object
+      required:
+        - id
+        - customerId
+        - status
+        - totalAmount
+      properties:
+        id:
+          type: string
+          format: uuid
+        customerId:
+          type: string
+          example: CUST-001
+        status:
+          type: string
+          enum: [pending, completed, cancelled]
+        totalAmount:
+          type: number
+          format: float
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productId:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+              price:
+                type: number
+                format: float
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            deliveryAddress:
+              type: string
+            notes:
+              type: string
+            delivery:
+              $ref: "#/components/schemas/Delivery"
+
+    Delivery:
+      type: object
+      required:
+        - id
+        - orderId
+        - status
+        - address
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, in_transit, delivered, cancelled]
+        address:
+          type: string
+        notes:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        confirmedAt:
+          type: string
+          format: date-time
+        signature:
+          type: string
+
+    RequestLog:
+      type: object
+      properties:
+        _id:
+          type: string
+        service_name:
+          type: string
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE, PATCH]
+        endpoint:
+          type: string
+        status_code:
+          type: integer
+        request_body:
+          type: object
+        response_body:
+          type: object
+        duration_ms:
+          type: integer
+        error_message:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: Invalid request
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    ErrorResponse:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+security: []

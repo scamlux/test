@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: agri-platform-monitor
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: api-gateway
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+---
+apiVersion: v1
+kind: PrometheusRule
+metadata:
+  name: agri-platform-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: agri-platform.rules
+      interval: 30s
+      rules:
+        - alert: ApiGatewayHighErrorRate
+          expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "API Gateway high error rate detected"
+            description: "Error rate is {{ $value | humanizePercentage }}"
+
+        - alert: ServiceDown
+          expr: up{job=~"product-service|order-service|delivery-service"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "{{ $labels.job }} is down"
+            description: "Service has been unavailable for 2 minutes"
+
+        - alert: HighMemoryUsage
+          expr: container_memory_usage_bytes{pod=~"agri-.*"} / container_spec_memory_limit_bytes > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "High memory usage in {{ $labels.pod }}"
+            description: "Memory usage is {{ $value | humanizePercentage }}"
+
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="agri-platform"}[15m]) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash looping"
+            description: "Pod has restarted {{ $value }} times in the last 15 minutes"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: agri-prometheus
+  namespace: monitoring
+spec:
+  replicas: 2
+  retention: 15d
+  retentionSize: "10GB"
+  serviceMonitorSelector:
+    matchLabels:
+      release: prometheus
+  ruleSelector:
+    matchLabels:
+      prometheus: kube-prometheus
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  storageSpec:
+    volumeClaimTemplate:
+      spec:
+        resources:
+          requests:
+            storage: 20Gi
+  alertingSpec:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+      evaluation_interval: 30s
+      external_labels:
+        cluster: 'agri-platform'
+        environment: 'production'
+
+    scrape_configs:
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - agri-platform
+                - monitoring
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+      
+      - job_name: 'loki'
+        static_configs:
+          - targets:
+              - 'loki:3100'
+      
+      - job_name: 'grafana'
+        static_configs:
+          - targets:
+              - 'grafana:3000'

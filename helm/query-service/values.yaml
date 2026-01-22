@@ -1,0 +1,49 @@
+replicaCount: 2
+image:
+  repository: docker.io/scamlux3221/query-service
+  tag: latest
+service:
+  port: 8005
+  targetPort: 8005
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+env:
+  - name: NODE_ENV
+    value: production
+  - name: PORT
+    value: "8005"
+  - name: DB_HOST
+    value: postgres-service
+  - name: DB_NAME
+    value: query_db
+  - name: KAFKA_BROKERS
+    value: kafka-service:9092
+  - name: MONGO_URL
+    valueFrom:
+      secretKeyRef:
+        name: mongodb-credentials
+        key: connection-string
+  - name: MONGO_DB
+    value: agri-logs
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8005
+  initialDelaySeconds: 30
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8005
+  initialDelaySeconds: 10
+  periodSeconds: 5

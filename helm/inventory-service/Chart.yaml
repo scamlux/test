@@ -1,0 +1,6 @@
+apiVersion: v2
+name: inventory-service
+description: A Helm chart for Agri Platform Inventory Service
+type: application
+version: 1.0.0
+appVersion: "1.0"

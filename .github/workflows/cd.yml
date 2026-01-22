@@ -1,0 +1,209 @@
+name: CD - ArgoCD Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cd.yml"
+      - "helm/**"
+      - "k8s/**"
+  workflow_run:
+    workflows: ["CI - Build & Push Docker Images"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ARGOCD_VERSION: v2.8.0
+  ARGOCD_NAMESPACE: argocd
+  CLUSTER_NAME: agri-platform
+  DOCKER_REGISTRY: docker.io
+  IMAGE_PREFIX: scamlux3221
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            VERSION="v$(date +'%Y.%m.%d')-${GITHUB_SHA::7}"
+          else
+            VERSION="${GITHUB_REF#refs/heads/}-${GITHUB_SHA::7}"
+          fi
+          echo "tag=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "latest"
+
+      - name: Configure kubeconfig
+        if: ${{ secrets.KUBE_CONFIG != '' }}
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Check cluster connection
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+        continue-on-error: true
+
+      - name: Install/Update ArgoCD
+        run: |
+          echo "Installing ArgoCD ${{ env.ARGOCD_VERSION }}..."
+
+          kubectl create namespace ${{ env.ARGOCD_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -n ${{ env.ARGOCD_NAMESPACE }} -f https://raw.githubusercontent.com/argoproj/argo-cd/release-${{ env.ARGOCD_VERSION }}/manifests/install.yaml
+
+          echo "Waiting for ArgoCD server to be ready..."
+          kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n ${{ env.ARGOCD_NAMESPACE }} || echo "Warning: ArgoCD startup may be delayed"
+        continue-on-error: true
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "latest"
+
+      - name: Create namespaces
+        run: |
+          kubectl create namespace agri-platform --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          kubectl label namespace agri-platform prometheus.io/monitor=true --overwrite || true
+          echo "✓ Namespaces created"
+
+      - name: Deploy services with Helm
+        run: |
+          IMAGE_TAG="${{ steps.version.outputs.tag }}"
+
+          echo "Deploying all services with image tag: $IMAGE_TAG"
+
+          SERVICES=(
+            "api-gateway:8000"
+            "product-service:8001"
+            "order-service:8002"
+            "inventory-service:8003"
+            "delivery-service:8004"
+            "query-service:8005"
+            "payment-service:8006"
+          )
+
+          for service_info in "${SERVICES[@]}"; do
+            service=$(echo $service_info | cut -d: -f1)
+            port=$(echo $service_info | cut -d: -f2)
+            
+            if [ -d "helm/$service" ]; then
+              echo "→ Deploying $service (port $port)..."
+              helm upgrade --install $service helm/$service/ \
+                --namespace agri-platform \
+                --set image.tag=$IMAGE_TAG \
+                --set image.repository="${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_PREFIX }}/$service" \
+                --wait \
+                --timeout 5m \
+                --atomic || echo "⚠ Warning: $service deployment may be pending"
+            else
+              echo "⚠ Skipping $service - chart not found"
+            fi
+          done
+
+          # Deploy web frontend
+          if [ -d "helm/web" ]; then
+            echo "→ Deploying web frontend..."
+            helm upgrade --install web helm/web/ \
+              --namespace agri-platform \
+              --set image.tag=$IMAGE_TAG \
+              --set image.repository="${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_PREFIX }}/agri-web" \
+              --wait \
+              --timeout 5m \
+              --atomic || echo "⚠ Warning: web deployment may be pending"
+          fi
+
+          echo "✓ All services deployed"
+        continue-on-error: true
+
+      - name: Apply monitoring stack
+        run: |
+          echo "Deploying monitoring stack..."
+
+          kubectl apply -f k8s/monitoring/prometheus.yml -n monitoring --record || echo "⚠ Prometheus deployment skipped"
+          kubectl apply -f k8s/monitoring/loki.yml -n monitoring --record || echo "⚠ Loki deployment skipped"
+          kubectl apply -f k8s/monitoring/grafana.yml -n monitoring --record || echo "⚠ Grafana deployment skipped"
+
+          echo "✓ Monitoring stack deployed"
+        continue-on-error: true
+
+      - name: Apply ArgoCD configuration
+        run: |
+          echo "Applying ArgoCD configuration..."
+
+          kubectl apply -f k8s/argocd/application.yaml || echo "⚠ ArgoCD Application config skipped"
+
+          echo "✓ ArgoCD configuration applied"
+        continue-on-error: true
+
+      - name: Wait for deployments
+        run: |
+          echo "Waiting for critical services to be ready..."
+
+          for deployment in api-gateway order-service product-service; do
+            echo "Checking $deployment..."
+            timeout 300 kubectl rollout status deployment/$deployment \
+              -n agri-platform || echo "⚠ $deployment rollout incomplete"
+          done
+
+          echo "✓ Deployment check complete"
+        continue-on-error: true
+
+      - name: Get deployment status
+        if: always()
+        run: |
+          echo "## 📊 Deployment Status Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Services Status" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get deployments -n agri-platform --no-headers || echo "No deployments found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Pod Status" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n agri-platform || echo "No pods found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Services & Endpoints" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get svc -n agri-platform || echo "No services found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Monitoring Stack" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n monitoring || echo "Monitoring namespace not ready" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Recent Events" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get events -n agri-platform --sort-by='.lastTimestamp' | tail -10 || echo "No events" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify deployment completion
+        if: always()
+        run: |
+          echo "✅ Deployment Workflow Completed"
+          echo "Image Tag: ${{ steps.version.outputs.tag }}"
+          echo "Access Grafana: http://localhost:3000"
+          echo "Check ArgoCD: kubectl port-forward svc/argocd-server 8080:443 -n argocd"

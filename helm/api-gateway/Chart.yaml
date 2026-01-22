@@ -1,0 +1,17 @@
+apiVersion: v2
+name: api-gateway
+description: API Gateway service for Agri Platform
+type: application
+version: 1.0.0
+appVersion: "1.0"
+
+keywords:
+  - api-gateway
+  - microservices
+  - agri-platform
+
+maintainers:
+  - name: Agri Platform Team
+    email: team@agri-platform.local
+
+dependencies: []
