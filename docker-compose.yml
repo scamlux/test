@@ -227,7 +227,7 @@ services:
   # ======================
 
   web:
-    image: scamlux3221/agri-web:${TAG:-latest}
+    image: scamlux3221/web:${TAG:-latest}
     depends_on: [api-gateway]
     ports:
       - "3000:3000"
