@@ -45,6 +45,7 @@ async function startKafka() {
   await consumer.subscribe({
     topic: "inventory.released",
     fromBeginning: true,
+    
   });
 
   await consumer.run({

@@ -53,10 +53,10 @@ Registry: docker.io
 ✨ Агри Платформа запущена!
 
 📍 Доступные сервисы:
-   Frontend:        http://localhost:3000
+   Frontend:        http://localhost:3001
    API Gateway:     http://localhost:8000
    Swagger Docs:    http://localhost:8080
-   Grafana:         http://localhost:3000 (admin/admin)
+   Grafana:         http://localhost:3001 (admin/admin)
    Prometheus:      http://localhost:9090
    Loki:            http://localhost:3100
 ```
@@ -182,10 +182,10 @@ Summary:
 ✨ All systems operational!
 
 Quick Links:
-  📱 Frontend:   http://localhost:3000
+  📱 Frontend:   http://localhost:3001
   🔗 API:        http://localhost:8000
   📖 Swagger:    http://localhost:8080
-  📊 Grafana:    http://localhost:3000
+  📊 Grafana:    http://localhost:3001
 ```
 
 ### Статус выхода
@@ -334,7 +334,7 @@ docker system prune -a
 ```bash
 # Проверить, какие процессы используют порты
 lsof -i :8000   # API Gateway
-lsof -i :3000   # Frontend & Grafana
+lsof -i :3001   # Frontend & Grafana
 lsof -i :5432   # PostgreSQL
 
 # Убить процесс

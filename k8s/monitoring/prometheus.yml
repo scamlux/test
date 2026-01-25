@@ -158,4 +158,4 @@ data:
       - job_name: 'grafana'
         static_configs:
           - targets:
-              - 'grafana:3000'
+              - 'grafana:3001'

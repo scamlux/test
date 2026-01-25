@@ -131,7 +131,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning
     ports:
-      - "3001:3000"
+      - "3001:3001"
     networks: [agri-net]
     depends_on:
       - prometheus
@@ -236,7 +236,7 @@ services:
     image: scamlux3221/web:${TAG:-latest}
     depends_on: [api-gateway]
     ports:
-      - "3000:3000"
+      - "3001:3001"
     networks: [agri-net]
     environment:
       REACT_APP_API_URL: http://api-gateway:8000

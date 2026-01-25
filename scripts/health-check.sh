@@ -60,7 +60,7 @@ echo ""
 
 # Monitoring & Logging
 echo "Monitoring Stack:"
-check_service "Grafana" "http://localhost:3000"
+check_service "Grafana" "http://localhost:3001"
 check_service "Prometheus" "http://localhost:9090"
 check_service "Loki" "http://localhost:3100"
 check_service "Tempo" "http://localhost:3200"
@@ -68,7 +68,7 @@ echo ""
 
 # Frontend
 echo "Frontend:"
-check_service "React App" "http://localhost:3000"
+check_service "React App" "http://localhost:3001"
 check_service "Swagger UI" "http://localhost:8080"
 echo ""
 
@@ -99,10 +99,10 @@ if [ "$failed" -eq 0 ]; then
     echo -e "${GREEN}✨ All systems operational!${NC}"
     echo ""
     echo "Quick Links:"
-    echo "  📱 Frontend:   http://localhost:3000"
+    echo "  📱 Frontend:   http://localhost:3001"
     echo "  🔗 API:        http://localhost:8000"
     echo "  📖 Swagger:    http://localhost:8080"
-    echo "  📊 Grafana:    http://localhost:3000"
+    echo "  📊 Grafana:    http://localhost:3001"
     exit 0
 else
     echo ""

@@ -69,7 +69,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana-dashboard
     ports:
-      - "3001:3000"
+      - "3001:3001"
     networks: [agri-net]
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -280,7 +280,7 @@ services:
     image: scamlux3221/web:${TAG:-latest}
     depends_on: [api-gateway]
     ports:
-      - "3000:3000"
+      - "3000:3001"
     networks: [agri-net]
     environment:
       REACT_APP_API_URL: http://api-gateway:8000

@@ -19,7 +19,7 @@ docker-compose up -d
 
 **Access:**
 
-- Web App: http://localhost:3000
+- Web App: http://localhost:3001
 - API: http://localhost:8000
 - Swagger: http://localhost:8080
 - Grafana: http://localhost:3001 (admin/admin)
@@ -31,7 +31,7 @@ docker-compose up -d
 ./start.sh k8s
 
 # Then access services via port-forward
-kubectl port-forward -n agri-platform svc/web 3000:3000
+kubectl port-forward -n agri-platform svc/web 3000:3001
 kubectl port-forward -n agri-platform svc/api-gateway 8000:8000
 kubectl port-forward -n monitoring svc/grafana 3001:80
 ```
@@ -223,7 +223,7 @@ GET    /api/logs             # Request logs
 ### Local Test
 
 ```bash
-# Create order via web UI (http://localhost:3000)
+# Create order via web UI (http://localhost:3001)
 # Check status in dashboard
 # Verify in Grafana (http://localhost:3001)
 ```
@@ -371,7 +371,7 @@ kubectl port-forward -n agri-platform svc/order-service 8001:8001
 
 - [ ] Clone repository: `git clone https://github.com/scamlux/test`
 - [ ] Run setup: `./start.sh all`
-- [ ] Web app loads: http://localhost:3000
+- [ ] Web app loads: http://localhost:3001
 - [ ] Create order via form
 - [ ] Check dashboard for order status
 - [ ] Open Grafana: http://localhost:3001
