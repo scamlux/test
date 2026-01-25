@@ -1,5 +1,5 @@
 const { connect } = require("../infrastructure/database");
-const { v4: uuid } = require("uuid");
+const { v4: uuid } = require("../shared/uuid-helper");
 
 class RequestLogRepository {
   async log(logData) {

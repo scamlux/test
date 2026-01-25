@@ -18,9 +18,10 @@ CREATE TABLE IF NOT EXISTS products (
 -- ==========================================
 CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY,
-  customer_id UUID NOT NULL,
+  payload JSONB,
+  customer_id UUID,
   status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-  total_amount DECIMAL(10, 2) NOT NULL,
+  total_amount DECIMAL(10, 2),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -96,7 +97,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
 CREATE TABLE IF NOT EXISTS outbox_events (
   id UUID PRIMARY KEY,
   aggregate_id UUID NOT NULL,
-  aggregate_type VARCHAR(100) NOT NULL,
+  aggregate_type VARCHAR(100),
   event_type TEXT NOT NULL,
   payload JSONB NOT NULL,
   sent BOOLEAN DEFAULT FALSE,

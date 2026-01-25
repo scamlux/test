@@ -23,7 +23,7 @@ class Product {
   }
 
   static create(sku, name, description, price, stockQuantity) {
-    const { v4: uuid } = require("uuid");
+    const { v4: uuid } = require("../../shared/uuid-helper");
     return new Product(uuid(), sku, name, description, price, stockQuantity);
   }
 

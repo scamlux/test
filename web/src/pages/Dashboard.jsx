@@ -6,86 +6,191 @@ import {
   Package,
   Truck,
   RefreshCw,
-  MoreVertical,
+  Edit2,
+  Save,
+  X,
 } from "lucide-react";
 import "../styles/Dashboard.css";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
-    totalOrders: 145,
-    completedOrders: 98,
-    pendingOrders: 32,
-    cancelledOrders: 15,
-    totalDeliveries: 87,
-    completedDeliveries: 72,
-    pendingDeliveries: 15,
+    totalOrders: 0,
+    completedOrders: 0,
+    pendingOrders: 0,
+    shippedOrders: 0,
+    totalProducts: 0,
+    totalDeliveries: 0,
+    totalRevenue: 0,
   });
+
+  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [error, setError] = useState(null);
+  const [editingOrderId, setEditingOrderId] = useState(null);
+  const [editingStatus, setEditingStatus] = useState("");
+  const [user, setUser] = useState(null);
 
+  // Get user from localStorage
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000); // Auto-refresh every 10s
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
+
+  // Fetch all data on mount
+  useEffect(() => {
+    fetchAllData();
+    const interval = setInterval(fetchAllData, 30000); // Auto-refresh every 30s
     return () => clearInterval(interval);
   }, []);
 
-  const fetchData = async () => {
+  const getAuthHeader = () => {
+    const token = localStorage.getItem("accessToken");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const fetchAllData = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/metrics");
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      }
       setError(null);
+
+      // Fetch dashboard stats from real database
+      const statsRes = await fetch("http://localhost:8000/api/v2/dashboard", {
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeader(),
+        },
+      });
+
+      if (!statsRes.ok) throw new Error("Failed to fetch stats");
+      const statsData = await statsRes.json();
+      setStats(statsData.data || {});
+
+      // Fetch orders
+      const ordersRes = await fetch("http://localhost:8000/api/v2/orders", {
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeader(),
+        },
+      });
+
+      if (!ordersRes.ok) throw new Error("Failed to fetch orders");
+      const ordersData = await ordersRes.json();
+      setOrders(ordersData.data || []);
+
+      // Fetch products
+      const productsRes = await fetch("http://localhost:8000/api/v2/products", {
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeader(),
+        },
+      });
+
+      if (!productsRes.ok) throw new Error("Failed to fetch products");
+      const productsData = await productsRes.json();
+      setProducts(productsData.data || []);
     } catch (err) {
-      console.error("Error fetching metrics:", err);
-      setError("Failed to fetch metrics");
+      console.error("Error fetching data:", err);
+      setError(err.message || "Failed to fetch data");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/v2/orders/${orderId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeader(),
+          },
+          body: JSON.stringify({ status: newStatus }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.reason || errorData.error || "Failed to update order",
+        );
+      }
+
+      // Refresh data after update
+      await fetchAllData();
+      setEditingOrderId(null);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      PENDING: "#f59e0b",
+      CONFIRMED: "#3b82f6",
+      SHIPPED: "#8b5cf6",
+      DELIVERED: "#10b981",
+      CANCELLED: "#ef4444",
+    };
+    return colors[status] || "#6b7280";
+  };
+
+  const canUpdateStatus = (order) => {
+    if (!user) return false;
+
+    // ADMIN can update any order
+    if (user.roles && user.roles.includes("ADMIN")) return true;
+
+    // SELLER can update orders containing their products
+    if (user.roles && user.roles.includes("SELLER")) {
+      return (
+        order.items && order.items.some((item) => item.sellerId === user.id)
+      );
+    }
+
+    // BUYER can cancel their own orders
+    if (user.roles && user.roles.includes("BUYER")) {
+      return order.buyer_id === user.id;
+    }
+
+    return false;
+  };
+
   const summaryCards = [
     {
       title: "Total Orders",
-      value: stats.totalOrders,
+      value: stats.totalOrders || 0,
       icon: Package,
       bgGradient: "from-blue-500 to-blue-600",
-      change: "+12%",
     },
     {
       title: "Completed",
-      value: stats.completedOrders,
+      value: stats.completedOrders || 0,
       icon: CheckCircle2,
       bgGradient: "from-green-500 to-green-600",
-      change: "+8%",
     },
     {
       title: "Pending",
-      value: stats.pendingOrders,
+      value: stats.pendingOrders || 0,
       icon: Clock,
       bgGradient: "from-yellow-500 to-yellow-600",
-      change: "-5%",
     },
     {
       title: "Deliveries",
-      value: stats.totalDeliveries,
+      value: stats.totalDeliveries || 0,
       icon: Truck,
       bgGradient: "from-purple-500 to-purple-600",
-      change: "+3%",
     },
   ];
 
   const completionRate =
     stats.totalOrders > 0
       ? ((stats.completedOrders / stats.totalOrders) * 100).toFixed(0)
-      : 0;
-
-  const deliveryRate =
-    stats.totalDeliveries > 0
-      ? ((stats.completedDeliveries / stats.totalDeliveries) * 100).toFixed(0)
       : 0;
 
   return (
@@ -107,7 +212,7 @@ export default function Dashboard() {
               </div>
             )}
             <button
-              onClick={fetchData}
+              onClick={fetchAllData}
               disabled={loading}
               className="btn-refresh"
             >
@@ -132,7 +237,6 @@ export default function Dashboard() {
                   <div className="card-text">
                     <p className="card-label">{card.title}</p>
                     <p className="card-value">{card.value.toLocaleString()}</p>
-                    <p className="card-change">{card.change} from last week</p>
                   </div>
                   <div
                     className={`card-icon bg-gradient-to-br ${card.bgGradient}`}
@@ -151,7 +255,7 @@ export default function Dashboard() {
             {[
               { id: "overview", label: "Overview", icon: "📊" },
               { id: "orders", label: "Orders", icon: "📦" },
-              { id: "deliveries", label: "Deliveries", icon: "🚚" },
+              { id: "products", label: "Products", icon: "🌾" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -198,17 +302,25 @@ export default function Dashboard() {
                         <div
                           className="bar-segment"
                           style={{
-                            width: `${deliveryRate}%`,
-                            backgroundColor: "#3b82f6",
+                            width: `${stats.totalOrders > 0 ? ((stats.pendingOrders / stats.totalOrders) * 100).toFixed(0) : 0}%`,
+                            backgroundColor: "#f59e0b",
                           }}
                         ></div>
                       </div>
                       <div className="status-label">
-                        <span>Delivered</span>
-                        <span className="status-percent">{deliveryRate}%</span>
+                        <span>Pending Orders</span>
+                        <span className="status-percent">
+                          {stats.totalOrders > 0
+                            ? (
+                                (stats.pendingOrders / stats.totalOrders) *
+                                100
+                              ).toFixed(0)
+                            : 0}
+                          %
+                        </span>
                       </div>
                       <p className="status-count">
-                        {stats.completedDeliveries} of {stats.totalDeliveries}
+                        {stats.pendingOrders} pending
                       </p>
                     </div>
 
@@ -217,57 +329,68 @@ export default function Dashboard() {
                         <div
                           className="bar-segment"
                           style={{
-                            width: `${((stats.pendingOrders / stats.totalOrders) * 100).toFixed(0)}%`,
-                            backgroundColor: "#f59e0b",
+                            width: `${stats.totalOrders > 0 ? ((stats.shippedOrders / stats.totalOrders) * 100).toFixed(0) : 0}%`,
+                            backgroundColor: "#8b5cf6",
                           }}
                         ></div>
                       </div>
                       <div className="status-label">
-                        <span>Pending Orders</span>
+                        <span>Shipped Orders</span>
                         <span className="status-percent">
-                          {(
-                            (stats.pendingOrders / stats.totalOrders) *
-                            100
-                          ).toFixed(0)}
+                          {stats.totalOrders > 0
+                            ? (
+                                (stats.shippedOrders / stats.totalOrders) *
+                                100
+                              ).toFixed(0)
+                            : 0}
                           %
                         </span>
                       </div>
                       <p className="status-count">
-                        {stats.pendingOrders} pending
+                        {stats.shippedOrders} shipped
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Recent Activity */}
+                {/* Recent Orders from DB */}
                 <div className="card-panel">
                   <h2 className="panel-title">Recent Orders</h2>
                   <div className="activity-list">
-                    {[1, 2, 3, 4, 5].map((idx) => (
-                      <div key={idx} className="activity-item">
+                    {orders.slice(0, 5).map((order) => (
+                      <div key={order.id} className="activity-item">
                         <div
                           className="activity-icon"
                           style={{
-                            backgroundColor: `hsl(${idx * 60}, 70%, 60%)`,
+                            backgroundColor: getStatusColor(order.status),
                           }}
                         >
                           <Package className="w-4 h-4 text-white" />
                         </div>
                         <div className="activity-content">
                           <p className="activity-title">
-                            Order #ORD{String(1000 + idx).slice(-4)}
+                            Order {order.id.substring(0, 8).toUpperCase()}
                           </p>
                           <p className="activity-time">
-                            Customer ID: CST{String(5000 + idx).slice(-4)}
+                            {order.buyer_name || "Customer"} -{" "}
+                            {order.items?.length || 0} items
                           </p>
                         </div>
                         <span
-                          className={`status-badge ${idx % 2 === 0 ? "completed" : "pending"}`}
+                          className={`status-badge ${order.status.toLowerCase()}`}
+                          style={{
+                            backgroundColor: getStatusColor(order.status),
+                          }}
                         >
-                          {idx % 2 === 0 ? "Completed" : "Pending"}
+                          {order.status}
                         </span>
                       </div>
                     ))}
+                    {orders.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">
+                        No orders yet
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -283,92 +406,153 @@ export default function Dashboard() {
                     <tr>
                       <th>Order ID</th>
                       <th>Customer</th>
+                      <th>Items</th>
+                      <th>Amount</th>
                       <th>Status</th>
                       <th>Created</th>
                       <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {[1, 2, 3, 4, 5].map((idx) => (
-                      <tr key={idx}>
-                        <td className="font-mono">
-                          ORD{String(1000 + idx).slice(-4)}...
+                    {orders.map((order) => (
+                      <tr key={order.id}>
+                        <td className="font-mono text-sm">
+                          {order.id.substring(0, 8).toUpperCase()}
                         </td>
-                        <td>CST{String(5000 + idx).slice(-4)}</td>
+                        <td>{order.buyer_name || "N/A"}</td>
+                        <td>{order.items?.length || 0}</td>
+                        <td>${(order.total_amount || 0).toFixed(2)}</td>
                         <td>
-                          <span
-                            className={`status-badge ${idx % 2 === 0 ? "completed" : "pending"}`}
-                          >
-                            {idx % 2 === 0 ? "Completed" : "Pending"}
-                          </span>
+                          {editingOrderId === order.id ? (
+                            <select
+                              value={editingStatus}
+                              onChange={(e) => setEditingStatus(e.target.value)}
+                              className="px-2 py-1 border rounded"
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="CONFIRMED">CONFIRMED</option>
+                              <option value="SHIPPED">SHIPPED</option>
+                              <option value="DELIVERED">DELIVERED</option>
+                              <option value="CANCELLED">CANCELLED</option>
+                            </select>
+                          ) : (
+                            <span
+                              className="status-badge"
+                              style={{
+                                backgroundColor: getStatusColor(order.status),
+                              }}
+                            >
+                              {order.status}
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-sm text-gray-600">
+                          {new Date(order.created_at).toLocaleDateString()}
                         </td>
                         <td>
-                          {new Date(
-                            Date.now() - idx * 86400000,
-                          ).toLocaleDateString()}
-                        </td>
-                        <td className="action-cell">
-                          <button className="icon-button">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
+                          {canUpdateStatus(order) ? (
+                            <div className="flex gap-2">
+                              {editingOrderId === order.id ? (
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateOrderStatus(
+                                        order.id,
+                                        editingStatus,
+                                      )
+                                    }
+                                    className="p-1 text-green-600 hover:bg-green-100 rounded"
+                                    title="Save"
+                                  >
+                                    <Save className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingOrderId(null)}
+                                    className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                    title="Cancel"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setEditingOrderId(order.id);
+                                    setEditingStatus(order.status);
+                                  }}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">
+                              No permission
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {orders.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">
+                    No orders found
+                  </p>
+                )}
               </div>
             </div>
           )}
 
-          {/* Deliveries Tab */}
-          {activeTab === "deliveries" && (
+          {/* Products Tab */}
+          {activeTab === "products" && (
             <div className="tab-content">
-              <div className="table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Delivery ID</th>
-                      <th>Order</th>
-                      <th>Status</th>
-                      <th>Address</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[1, 2, 3, 4, 5].map((idx) => (
-                      <tr key={idx}>
-                        <td className="font-mono">
-                          DEL{String(2000 + idx).slice(-4)}...
-                        </td>
-                        <td>ORD{String(1000 + idx).slice(-4)}...</td>
-                        <td>
-                          <span
-                            className={`status-badge ${idx % 2 === 0 ? "delivered" : "in-transit"}`}
-                          >
-                            {idx % 2 === 0 ? "Delivered" : "In Transit"}
-                          </span>
-                        </td>
-                        <td>Street {idx}, City</td>
-                        <td className="action-cell">
-                          <button className="icon-button">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="products-grid">
+                {products.map((product) => (
+                  <div key={product.id} className="product-card">
+                    <div className="product-header">
+                      <h3 className="product-name">{product.name}</h3>
+                      <span className="product-sku">{product.sku}</span>
+                    </div>
+                    <p className="product-description">
+                      {product.description || "No description"}
+                    </p>
+                    <div className="product-meta">
+                      <div className="meta-item">
+                        <span className="meta-label">Price:</span>
+                        <span className="meta-value">
+                          ${product.price?.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-label">Stock:</span>
+                        <span className="meta-value">
+                          {product.stock_quantity}
+                        </span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-label">Seller:</span>
+                        <span className="meta-value">
+                          {product.seller_name || "Admin"}
+                        </span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-label">Status:</span>
+                        <span className="meta-value">{product.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+              {products.length === 0 && (
+                <p className="text-center text-gray-500 py-8">
+                  No products found
+                </p>
+              )}
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="dashboard-footer">
-          <p>
-            🔄 Auto-refreshing every 10 seconds | Last updated:{" "}
-            {new Date().toLocaleTimeString()}
-          </p>
         </div>
       </div>
     </div>

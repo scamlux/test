@@ -28,7 +28,7 @@ app.use(rateLimiter);
 // =======================
 const kafka = new Kafka({
   clientId: "order-service",
-  brokers: ["localhost:19092"],
+  brokers: (process.env.KAFKA_BROKERS || "kafka:9092").split(","),
 });
 
 const producer = kafka.producer();
@@ -85,13 +85,18 @@ app.post("/orders", async (req, res) => {
     log("Order", orderId, "Order persisted + outbox event created");
 
     return res.status(202).json({
-      message: "Order accepted",
-      orderId,
+      status: "success",
+      data: {
+        orderId,
+        status: "PENDING",
+        message: "Order accepted for processing",
+      },
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
-      error: "Order creation failed",
+      status: "error",
+      message: "Order creation failed",
     });
   }
 });

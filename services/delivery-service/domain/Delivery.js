@@ -21,7 +21,7 @@ class Delivery {
   }
 
   static create(orderId, expectedDeliveryDate) {
-    const { v4: uuid } = require("uuid");
+    const { v4: uuid } = require("../../shared/uuid-helper");
     return new Delivery(uuid(), orderId, "PENDING", expectedDeliveryDate);
   }
 
@@ -43,7 +43,7 @@ class Delivery {
     this.updatedAt = new Date();
 
     return {
-      id: require("uuid").v4(),
+      id: require("../../shared/uuid-helper").v4(),
       deliveryId: this.id,
       recipientName,
       signature,

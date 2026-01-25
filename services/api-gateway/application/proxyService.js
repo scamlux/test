@@ -2,13 +2,20 @@ const axios = require("axios");
 const requestLogRepository = require("../domain/RequestLogRepository");
 
 const SERVICE_URLS = {
-  "product-service": "http://localhost:8003",
-  "order-service": "http://localhost:8001",
-  "delivery-service": "http://localhost:8004",
-  "query-service": "http://localhost:8002",
+  "product-service": `http://${process.env.PRODUCT_SERVICE_HOST || "product-service"}:8003`,
+  "order-service": `http://${process.env.ORDER_SERVICE_HOST || "order-service"}:8001`,
+  "delivery-service": `http://${process.env.DELIVERY_SERVICE_HOST || "delivery-service"}:8004`,
+  "query-service": `http://${process.env.QUERY_SERVICE_HOST || "query-service"}:8002`,
+  "auth-service": `http://${process.env.AUTH_SERVICE_HOST || "auth-service"}:8005`,
 };
 
-async function proxyRequest(serviceName, method, path, data = null) {
+async function proxyRequest(
+  serviceName,
+  method,
+  path,
+  data = null,
+  authHeader = null,
+) {
   const startTime = Date.now();
   const serviceUrl = SERVICE_URLS[serviceName];
 
@@ -22,6 +29,11 @@ async function proxyRequest(serviceName, method, path, data = null) {
       url: `${serviceUrl}${path}`,
       headers: { "Content-Type": "application/json" },
     };
+
+    // Add authorization header if provided
+    if (authHeader) {
+      config.headers.Authorization = authHeader;
+    }
 
     if (data && (method === "POST" || method === "PUT")) {
       config.data = data;

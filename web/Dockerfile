@@ -1,11 +1,11 @@
-FROM node:18-alpine as builder
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY web/package*.json ./
 RUN npm install
 
-COPY . .
+COPY web .
 RUN npm run build
 
 FROM node:18-alpine

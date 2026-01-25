@@ -2,14 +2,14 @@
 // APPLICATION LAYER - Use Cases
 // ===================================
 
-const { v4: uuid } = require("uuid");
+const { v4: uuid } = require("../../shared/uuid-helper");
 const Product = require("../domain/Product");
 const productRepository = require("../domain/ProductRepository");
 const log = require("../../shared/logger");
 
 class CreateProductUseCase {
   async execute(command) {
-    const { sku, name, description, price, stockQuantity } = command;
+    const { sku, name, description, price, stockQuantity = 100 } = command;
 
     const existingProduct = await productRepository.findBySku(sku);
     if (existingProduct) {

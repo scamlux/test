@@ -1,7 +1,7 @@
 const { MongoClient } = require("mongodb");
 
 const MONGO_URL =
-  process.env.MONGO_URL || "mongodb://admin:admin@localhost:27017";
+  process.env.MONGO_URL || "mongodb://root:rootpass@mongodb:27017";
 const MONGO_DB = process.env.MONGO_DB || "agri-logs";
 
 let client = null;

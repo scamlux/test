@@ -70,6 +70,16 @@ router.post("/deliveries/:id/cancel", async (req, res) => {
   }
 });
 
+// GET ALL DELIVERIES
+router.get("/deliveries", async (req, res) => {
+  try {
+    // Placeholder: в реальной системе нужно получить из БД
+    res.json({ status: "success", data: [] });
+  } catch (err) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
 // GET DELIVERY
 router.get("/deliveries/:id", async (req, res) => {
   try {

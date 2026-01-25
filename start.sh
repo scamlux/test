@@ -28,6 +28,7 @@ WEB_DIR="$PROJECT_DIR/web"
 
 # Configuration
 DOCKER_REGISTRY="scamlux3221"
+DOCKER_TAG="${TAG:-latest}"
 KUBE_VERSION="1.27"
 DEMO_MODE="${1:-all}"
 
@@ -55,10 +56,15 @@ check_requirements() {
 
   local missing=()
 
+  # Docker required for all modes
   command -v docker &> /dev/null || missing+=("docker")
-  command -v kubectl &> /dev/null || missing+=("kubectl")
-  command -v helm &> /dev/null || missing+=("helm")
-  command -v kind &> /dev/null || missing+=("kind")
+
+  # Kubernetes tools only needed for k8s mode
+  if [ "$DEMO_MODE" != "local" ]; then
+    command -v kubectl &> /dev/null || missing+=("kubectl")
+    command -v helm &> /dev/null || missing+=("helm")
+    command -v kind &> /dev/null || missing+=("kind")
+  fi
 
   if [ ${#missing[@]} -gt 0 ]; then
     print_error "Missing required tools: ${missing[*]}"
@@ -69,19 +75,20 @@ check_requirements() {
   print_success "All prerequisites installed"
 }
 
-# Setup local development (Docker Compose)
+# Setup local development (Docker Compose with Registry)
 setup_local() {
-  print_header "Setting Up Local Development (Docker Compose)"
+  print_header "Setting Up Local Development (Docker Compose with Registry)"
 
   cd "$PROJECT_DIR"
 
-  if [ ! -f "docker-compose.yml" ]; then
-    print_error "docker-compose.yml not found!"
+  if [ ! -f "docker-compose.registry.yml" ]; then
+    print_error "docker-compose.registry.yml not found!"
     exit 1
   fi
 
-  print_info "Starting Docker Compose stack..."
-  docker-compose up -d
+  print_info "Starting Docker Compose stack (TAG=$DOCKER_TAG)..."
+  TAG="$DOCKER_TAG" docker-compose -f docker-compose.registry.yml down -v 2>/dev/null || true
+  TAG="$DOCKER_TAG" docker-compose -f docker-compose.registry.yml up -d
 
   sleep 5
 
@@ -91,6 +98,11 @@ setup_local() {
   echo "  - API:        http://localhost:8000"
   echo "  - Swagger:    http://localhost:8080"
   echo "  - Grafana:    http://localhost:3001 (admin/admin)"
+  echo "  - Prometheus: http://localhost:9090"
+  echo ""
+  print_info "Deployed Version: $DOCKER_TAG"
+  echo "  To rollback: ./rollback.sh deploy <version>"
+  echo "  To list versions: ./rollback.sh list"
 }
 
 # Setup Kubernetes cluster

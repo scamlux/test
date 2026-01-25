@@ -32,17 +32,18 @@ services:
     image: postgres:15
     container_name: postgres-db
     environment:
-      POSTGRES_USER: orders_user
-      POSTGRES_PASSWORD: orders_pass
-      POSTGRES_DB: orders_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agridb
     ports:
       - "5432:5432"
     networks: [agri-net]
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/db-schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./infrastructure/db-schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./infrastructure/auth-schema.sql:/docker-entrypoint-initdb.d/2-auth-schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U orders_user"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,8 +52,8 @@ services:
     image: mongo:6.0
     container_name: mongodb-logs
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpass
     ports:
       - "27017:27017"
     networks: [agri-net]
@@ -68,7 +69,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana-dashboard
     ports:
-      - "3000:3000"
+      - "3001:3000"
     networks: [agri-net]
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -150,6 +151,9 @@ services:
   # ======================
 
   api-gateway:
+    build:
+      context: .
+      dockerfile: ./services/api-gateway/Dockerfile
     image: scamlux3221/api-gateway:${TAG:-latest}
     depends_on:
       [order-service, product-service, delivery-service, query-service]
@@ -158,11 +162,14 @@ services:
     networks: [agri-net]
     environment:
       DB_HOST: postgres
-      DB_USER: orders_user
-      DB_PASSWORD: orders_pass
-      DB_NAME: orders_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: agridb
 
   product-service:
+    build:
+      context: .
+      dockerfile: ./services/product-service/Dockerfile
     image: scamlux3221/product-service:${TAG:-latest}
     depends_on: [postgres]
     ports:
@@ -170,11 +177,14 @@ services:
     networks: [agri-net]
     environment:
       DB_HOST: postgres
-      DB_USER: orders_user
-      DB_PASSWORD: orders_pass
-      DB_NAME: orders_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: agridb
 
   order-service:
+    build:
+      context: .
+      dockerfile: ./services/order-service/Dockerfile
     image: scamlux3221/order-service:${TAG:-latest}
     depends_on: [kafka, postgres]
     ports:
@@ -182,12 +192,15 @@ services:
     networks: [agri-net]
     environment:
       DB_HOST: postgres
-      DB_USER: orders_user
-      DB_PASSWORD: orders_pass
-      DB_NAME: orders_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: agridb
       KAFKA_BROKERS: kafka:9092
 
   inventory-service:
+    build:
+      context: .
+      dockerfile: ./services/inventory-service/Dockerfile
     image: scamlux3221/inventory-service:${TAG:-latest}
     depends_on: [kafka]
     networks: [agri-net]
@@ -195,6 +208,9 @@ services:
       KAFKA_BROKERS: kafka:9092
 
   payment-service:
+    build:
+      context: .
+      dockerfile: ./services/payment-service/Dockerfile
     image: scamlux3221/payment-service:${TAG:-latest}
     depends_on: [kafka]
     networks: [agri-net]
@@ -202,6 +218,9 @@ services:
       KAFKA_BROKERS: kafka:9092
 
   delivery-service:
+    build:
+      context: .
+      dockerfile: ./services/delivery-service/Dockerfile
     image: scamlux3221/delivery-service:${TAG:-latest}
     depends_on: [postgres]
     ports:
@@ -209,11 +228,14 @@ services:
     networks: [agri-net]
     environment:
       DB_HOST: postgres
-      DB_USER: orders_user
-      DB_PASSWORD: orders_pass
-      DB_NAME: orders_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: agridb
 
   query-service:
+    build:
+      context: .
+      dockerfile: ./services/query-service/Dockerfile
     image: scamlux3221/query-service:${TAG:-latest}
     depends_on: [kafka]
     ports:
@@ -223,10 +245,38 @@ services:
       KAFKA_BROKERS: kafka:9092
 
   # ======================
+  # AUTH SERVICE
+  # ======================
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./services/auth-service/Dockerfile
+    image: scamlux3221/auth-service:${TAG:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8005:8005"
+    networks: [agri-net]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: agridb
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key-change-in-production}
+      JWT_EXPIRE: 1h
+      REFRESH_TOKEN_EXPIRE: 7d
+
+  # ======================
   # WEB FRONTEND
   # ======================
 
   web:
+    build:
+      context: .
+      dockerfile: ./web/Dockerfile
     image: scamlux3221/web:${TAG:-latest}
     depends_on: [api-gateway]
     ports:

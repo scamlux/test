@@ -1,5 +1,5 @@
 const pool = require("./db");
-const { v4: uuid } = require("uuid");
+const { v4: uuid } = require("../shared/uuid-helper");
 
 async function createOrderWithOutbox(payload) {
   const client = await pool.connect();
@@ -11,7 +11,7 @@ async function createOrderWithOutbox(payload) {
 
     await client.query(
       "INSERT INTO orders (id, payload, status) VALUES ($1, $2, $3)",
-      [orderId, payload, "CREATED"]
+      [orderId, payload, "CREATED"],
     );
 
     await client.query(
@@ -28,7 +28,7 @@ async function createOrderWithOutbox(payload) {
           payload,
           timestamp: new Date().toISOString(),
         }),
-      ]
+      ],
     );
 
     await client.query("COMMIT");

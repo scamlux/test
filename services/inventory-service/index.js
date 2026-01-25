@@ -6,7 +6,7 @@ const retry = require("../shared/retry");
 
 const kafka = new Kafka({
   clientId: "inventory-service",
-  brokers: ["localhost:19092"],
+  brokers: (process.env.KAFKA_BROKERS || "kafka:9092").split(","),
 });
 
 const consumer = kafka.consumer({ groupId: "inventory-group" });

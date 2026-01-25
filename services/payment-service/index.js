@@ -5,7 +5,7 @@ const getHandler = require("./handlers/eventHandlerFactory");
 
 const kafka = new Kafka({
   clientId: "payment-service",
-  brokers: ["localhost:19092"],
+  brokers: (process.env.KAFKA_BROKERS || "kafka:9092").split(","),
 });
 
 const consumer = kafka.consumer({ groupId: "payment-group" });

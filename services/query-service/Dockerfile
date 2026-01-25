@@ -2,11 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+# Copy package files
+COPY services/query-service/package*.json ./
+COPY services/shared ./shared/
+
+# Install dependencies
 RUN npm install --omit=dev
 
-COPY . .
+# Copy service code
+COPY services/query-service ./
 
-EXPOSE 3001
-
-CMD ["node", "index.js"]
+EXPOSE 8002
