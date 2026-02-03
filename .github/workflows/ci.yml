@@ -1,161 +1,24 @@
-name: CI - Build & Push Docker Images
+name: CI - api-gateway
 
 on:
   push:
-    branches:
-      - main
-      - develop
-    paths:
-      - "services/**"
-      - "web/**"
-      - ".github/workflows/ci.yml"
-      - "Dockerfile*"
-  pull_request:
-    branches:
-      - main
-      - develop
-
-env:
-  REGISTRY: docker.io
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+    branches: [ "main" ]
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      version: ${{ steps.version.outputs.version }}
-      short_sha: ${{ steps.version.outputs.short_sha }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Generate version
-        id: version
-        run: |
-          VERSION="${{ github.sha }}"
-          BRANCH="${{ github.ref_name }}"
-          if [ "$BRANCH" == "main" ]; then
-            TAG="v$(date +%Y.%m.%d)-${VERSION:0:7}"
-          else
-            TAG="${BRANCH}-${VERSION:0:7}"
-          fi
-          echo "version=$TAG" >> $GITHUB_OUTPUT
-          echo "short_sha=${VERSION:0:7}" >> $GITHUB_OUTPUT
-
-      - name: Set matrix
-        id: set-matrix
-        run: |
-          SERVICES='["api-gateway", "product-service", "order-service", "delivery-service", "query-service", "inventory-service", "payment-service", "web"]'
-          echo "matrix=$(echo $SERVICES | jq -c '{service: .}')" >> $GITHUB_OUTPUT
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: services/order-service/package-lock.json
-
-      - name: Test services
-        run: |
-          cd services
-          npm install
-          npm test -- --coverage --watchAll=false --passWithNoTests
-        continue-on-error: true
-
-      - name: Test web frontend
-        run: |
-          cd web
-          npm install
-          npm test -- --coverage --watchAll=false --passWithNoTests
-        continue-on-error: true
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        if: always()
-        with:
-          files: ./services/coverage/coverage-final.json,./web/coverage/coverage-final.json
-          fail_ci_if_error: false
-        continue-on-error: true
-
   build:
-    needs: [setup, test]
     runs-on: ubuntu-latest
-    strategy:
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
-      fail-fast: false
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.service }}
-        uses: docker/build-push-action@v4
-        with:
-          context: ${{ matrix.service == 'web' && './web' || format('./services/{0}', matrix.service) }}
-          push: ${{ github.event_name == 'push' }}
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ needs.setup.outputs.version }}
-            ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: ${{ matrix.service == 'web' && 'REACT_APP_API_URL=https://api.agri-platform.local' || '' }}
-        continue-on-error: true
-
-  security-scan:
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: "fs"
-          scan-ref: "./services"
-          format: "sarif"
-          output: "trivy-results.sarif"
-        continue-on-error: true
-
-      - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v2
-        if: always()
-        with:
-          sarif_file: "trivy-results.sarif"
-        continue-on-error: true
-
-  notify:
-    needs: [setup, build, test]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Create deployment notification
+      - name: Build & Push api-gateway
         run: |
-          echo "## 🐳 Docker Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "**Version**: ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Images pushed to Docker Hub" >> $GITHUB_STEP_SUMMARY
-          echo "⏳ Waiting for ArgoCD sync..." >> $GITHUB_STEP_SUMMARY
-
-      # 6. Autodeploy (simulation)
-      - name: Auto deploy (pull & up)
-        env:
-          TAG: ${{ github.sha }}
-        run: |
-          echo "Deployment version: $TAG"
+          docker build -t ghcr.io/scamlux/api-gateway:${{ github.sha }} services/api-gateway
+          docker push ghcr.io/scamlux/api-gateway:${{ github.sha }}

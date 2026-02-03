@@ -1,12 +1,16 @@
-FROM node:18-alpine
+FROM node:20-alpine AS builder
 
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci
 
 COPY . .
+RUN npm run build || echo "no build step"
 
-EXPOSE 8003
+FROM node:20-alpine
+WORKDIR /app
 
-CMD ["node", "index.js"]
+COPY --from=builder /app .
+EXPOSE 3000
+
+CMD ["npm", "start"]

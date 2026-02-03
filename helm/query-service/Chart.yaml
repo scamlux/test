@@ -1,6 +1,0 @@
-apiVersion: v2
-name: query-service
-description: A Helm chart for Agri Platform Query Service
-type: application
-version: 1.0.0
-appVersion: "1.0"
